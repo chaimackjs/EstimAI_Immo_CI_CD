@@ -35,10 +35,10 @@ jobs:
         run: |
           python auto.py
 
-      # Step 5: Lancement de main.py
-      - name: Lancement de main.py
+      # Step 5: Lancement de nettoyage.py
+      - name: Lancement de nettoyage.py
         run: |
-          python main.py
+          python nettoyage.py
 
       # Step 6: Entrainement des modèles
       - name: Lancement de ml.py
