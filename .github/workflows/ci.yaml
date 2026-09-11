@@ -2,36 +2,36 @@ name: EstimAI_Immo CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Étape 1 : récupération du dépôt applicatif
-      - name: Checkout repository
+      - name: Checkout CI/CD
+        uses: actions/checkout@v4
+
+      - name: Checkout application
         uses: actions/checkout@v4
         with:
           repository: chaimackjs/EstimAI_Immo
           ref: main
+          path: app
 
-      # Étape 2 : choix de la version Python
       - name: Installer Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: "pip"
 
-      # Étape 3 : installation des dépendances
-      - name: Installation des dépendances
+      - name: Installer les dépendances
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install -r app/requirements.txt
 
-      # Étape 4 : vérifier les nouvelles données
       - name: Vérifier les nouvelles données
         id: verifier_donnees
         continue-on-error: true
@@ -41,17 +41,14 @@ jobs:
         if: steps.verifier_donnees.outcome == 'failure'
         run: echo "::warning::De nouvelles données DVF ou DPE sont disponibles."
 
-      # Étape 5 : récupération des données DVF et DPE
       - name: Récupérer les données
-        run: |
-          python acquisition_donnees.py
+        working-directory: app
+        run: python acquisition_donnees.py
 
-      # Étape 6 : préparation des données
       - name: Préparer les données
-        run: |
-          python preparer_donnees.py
+        working-directory: app
+        run: python preparer_donnees.py
 
-      # Étape 7 : entraînement des modèles
       - name: Entraîner les modèles
-        run: |
-          python ml.py
+        working-directory: app
+        run: python ml.py
