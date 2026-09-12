@@ -69,11 +69,22 @@ def main():
         action="store_true",
         help="Retourner le code 1 si une nouvelle donnée est détectée",
     )
+    parser.add_argument(
+        "--mettre-a-jour",
+        action="store_true",
+        help="Enregistrer l’état distant comme nouvel état de référence",
+    )
     args = parser.parse_args()
 
     etat_local = charger_etat_local()
     etat_distant = recuperer_etat_distant()
     changements = comparer_etats(etat_local, etat_distant)
+
+    if args.mettre_a_jour:
+        with STATE_PATH.open("w", encoding="utf-8") as state_file:
+            json.dump(etat_distant, state_file, ensure_ascii=False, indent=2)
+            state_file.write("\n")
+        print(f"État des sources enregistré dans {STATE_PATH}.")
 
     print(f"Ressources DVF détectées : {len(etat_distant['dvf'])}")
     print(f"Diagnostics DPE détectés : {etat_distant['dpe']['total']}")
