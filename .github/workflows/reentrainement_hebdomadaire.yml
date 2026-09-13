@@ -53,12 +53,15 @@ jobs:
       - name: Récupérer les données
         if: steps.verifier_donnees.outputs.nouvelles_donnees == 'true'
         working-directory: app
-        run: python acquisition_donnees.py
+        run: >-
+          python acquisition_donnees.py
+          --avec-dpe
+          --force
 
       - name: Préparer les données
         if: steps.verifier_donnees.outputs.nouvelles_donnees == 'true'
         working-directory: app
-        run: python preparer_donnees.py
+        run: python preparer_donnees.py --force
 
       - name: Réentraîner les modèles
         if: steps.verifier_donnees.outputs.nouvelles_donnees == 'true'

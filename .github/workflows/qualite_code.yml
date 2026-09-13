@@ -1,0 +1,62 @@
+name: Qualité du code
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  qualite:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer la configuration CI/CD
+        uses: actions/checkout@v4
+
+      - name: Récupérer l’application
+        uses: actions/checkout@v4
+        with:
+          repository: chaimackjs/EstimAI_Immo
+          ref: main
+          path: app
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: app/requirements-dev.txt
+
+      - name: Installer les dépendances de développement
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r app/requirements-dev.txt
+
+      - name: Vérifier la syntaxe Python
+        working-directory: app
+        run: python -m compileall -q .
+
+      - name: Exécuter les tests et mesurer la couverture
+        working-directory: app
+        run: >-
+          python -m pytest -q
+          --cov=.
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+          --cov-report=html:htmlcov
+          --cov-fail-under=70
+
+      - name: Publier les rapports de couverture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports-couverture
+          path: |
+            app/coverage.xml
+            app/htmlcov/
+
+      - name: Vérifier la documentation Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: "app/**/*.md"

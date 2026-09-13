@@ -43,11 +43,14 @@ jobs:
 
       - name: Récupérer les données
         working-directory: app
-        run: python acquisition_donnees.py
+        run: >-
+          python acquisition_donnees.py
+          --avec-dpe
+          --force
 
       - name: Préparer les données
         working-directory: app
-        run: python preparer_donnees.py
+        run: python preparer_donnees.py --force
 
       - name: Entraîner les modèles
         working-directory: app
