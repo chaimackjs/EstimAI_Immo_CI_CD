@@ -20,12 +20,14 @@ jobs:
           repository: chaimackjs/EstimAI_Immo
           ref: main
           path: app
+          token: ${{ secrets.APP_REPO_TOKEN || github.token }}
 
       - name: Installer Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: "pip"
+          cache-dependency-path: app/requirements.txt
 
       - name: Installer les dépendances
         run: |
@@ -46,6 +48,9 @@ jobs:
         run: >-
           python acquisition_donnees.py
           --avec-dpe
+          --departements 69
+          --annee-debut 2021
+          --annee-fin "$(date -d '1 year ago' +%Y)"
           --force
 
       - name: Préparer les données
@@ -54,4 +59,24 @@ jobs:
 
       - name: Entraîner les modèles
         working-directory: app
-        run: python ml.py
+        run: python ml.py --r2-total-minimum 0.70 --exiger-qualite
+
+      - name: Publier le modele valide et les metriques
+        uses: actions/upload-artifact@v4
+        with:
+          name: modele-estimai-${{ github.sha }}
+          retention-days: 14
+          path: |
+            app/models/meilleur_modele.joblib
+            app/reports/metriques.json
+            app/reports/comparaison_validation.csv
+
+      - name: Mettre a jour le modele du depot applicatif
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: app
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f models/meilleur_modele.joblib
+          git diff --cached --quiet || git commit -m "chore: publier le modele valide"
+          git push origin HEAD:main
