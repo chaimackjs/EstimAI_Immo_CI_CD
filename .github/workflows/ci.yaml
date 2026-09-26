@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,21 +33,21 @@ jobs:
           cache: "pip"
           cache-dependency-path: app/requirements.txt
 
-      - name: Installer les dépendances
+      - name: Installer les dependances
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r app/requirements.txt
 
-      - name: Vérifier les nouvelles données
+      - name: Verifier les nouvelles donnees
         id: verifier_donnees
         continue-on-error: true
         run: python verifier_nouvelles_donnees.py --strict
 
-      - name: Signaler les nouvelles données
+      - name: Signaler les nouvelles donnees
         if: steps.verifier_donnees.outcome == 'failure'
-        run: echo "::warning::De nouvelles données DVF ou DPE sont disponibles."
+        run: echo "::warning::De nouvelles donnees DVF ou DPE sont disponibles."
 
-      - name: Récupérer les données
+      - name: Recuperer les donnees
         working-directory: app
         run: >-
           python acquisition_donnees.py
@@ -53,15 +57,21 @@ jobs:
           --annee-fin "$(date -d '1 year ago' +%Y)"
           --force
 
-      - name: Préparer les données
+      - name: Preparer les donnees
         working-directory: app
         run: python preparer_donnees.py --force
 
-      - name: Entraîner les modèles
+      - name: Entrainer les modeles
         working-directory: app
+        env:
+          MODEL_VERSION: run-${{ github.run_number }}-${{ github.sha }}
         run: python ml.py --r2-total-minimum 0.70 --exiger-qualite
 
-      - name: Publier le modele valide et les metriques
+      - name: Verifier le modele entraine
+        working-directory: app
+        run: python verifier_modele.py
+
+      - name: Publier le modele valide et les rapports
         uses: actions/upload-artifact@v4
         with:
           name: modele-estimai-${{ github.sha }}
@@ -70,6 +80,11 @@ jobs:
             app/models/meilleur_modele.joblib
             app/reports/metriques.json
             app/reports/comparaison_validation.csv
+            app/reports/importance_variables.csv
+            app/reports/qualite_donnees.json
+            app/reports/erreurs_par_type.csv
+            app/reports/version_modele.json
+            app/data/clean/manifest.json
 
       - name: Mettre a jour le modele du depot applicatif
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -80,3 +95,49 @@ jobs:
           git add -f models/meilleur_modele.joblib
           git diff --cached --quiet || git commit -m "chore: publier le modele valide"
           git push origin HEAD:main
+
+      - name: Verifier l'application Streamlit
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          APP_URL: https://estimaiimmo.streamlit.app/
+        run: |
+          for tentative in {1..12}; do
+            code=$(curl --silent --show-error --dump-header /tmp/streamlit.headers \
+              --output /tmp/streamlit.html \
+              --write-out "%{http_code}" --max-time 30 "$APP_URL" || true)
+            if [ "$code" = "200" ] && grep -qi "streamlit" /tmp/streamlit.html; then
+              echo "Application Streamlit disponible (tentative $tentative)."
+              exit 0
+            fi
+            if [ "$code" = "303" ] && grep -qi "share.streamlit.io/-/auth/app" /tmp/streamlit.headers; then
+              echo "L'application Streamlit est privee : rendre l'application publique."
+              exit 1
+            fi
+            echo "Tentative $tentative/12 : HTTP $code."
+            sleep 20
+          done
+          echo "L'application Streamlit ne repond pas correctement."
+          exit 1
+
+      - name: Creer une issue en cas d'echec
+        if: failure() && github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `[CI] Echec de ${context.workflow}`;
+            const body = [
+              `Le workflow **${context.workflow}** a echoue.`,
+              `Commit : \`${context.sha}\``,
+              `Execution : ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            ].join('\n\n');
+            const { data: issues } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', per_page: 100
+            });
+            const issue = issues.find(item => item.title === title);
+            if (issue) {
+              await github.rest.issues.update({
+                ...context.repo, issue_number: issue.number, body
+              });
+            } else {
+              await github.rest.issues.create({ ...context.repo, title, body });
+            }
