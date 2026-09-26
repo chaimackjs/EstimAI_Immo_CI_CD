@@ -17,6 +17,15 @@ jobs:
       - name: Recuperer la configuration CI/CD
         uses: actions/checkout@v4
 
+      - name: Verifier le jeton du depot applicatif
+        env:
+          APP_REPO_TOKEN: ${{ secrets.APP_REPO_TOKEN }}
+        run: |
+          if [ -z "$APP_REPO_TOKEN" ]; then
+            echo "::error::Le secret APP_REPO_TOKEN est requis pour publier dans chaimackjs/EstimAI_Immo. Creer un fine-grained PAT avec Contents: Read and write sur ce depot."
+            exit 1
+          fi
+
       - name: Recuperer l'application
         uses: actions/checkout@v4
         with:
