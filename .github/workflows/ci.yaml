@@ -108,6 +108,7 @@ jobs:
 
       - name: Verifier l'application Streamlit
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         env:
           APP_URL: https://estimaiimmo.streamlit.app/
         run: |

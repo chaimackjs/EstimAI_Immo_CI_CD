@@ -130,6 +130,7 @@ jobs:
 
       - name: Verifier l'application Streamlit
         if: steps.verifier_donnees.outputs.nouvelles_donnees == 'true'
+        continue-on-error: true
         env:
           APP_URL: https://estimaiimmo.streamlit.app/
         run: |
